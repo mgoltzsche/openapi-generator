@@ -22,19 +22,7 @@ import static org.openapitools.codegen.utils.StringUtils.underscore;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -44,16 +32,7 @@ import javax.annotation.Nullable;
 import lombok.Setter;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.openapitools.codegen.CodegenConfig;
-import org.openapitools.codegen.CodegenConstants;
-import org.openapitools.codegen.CodegenMediaType;
-import org.openapitools.codegen.CodegenModel;
-import org.openapitools.codegen.CodegenOperation;
-import org.openapitools.codegen.CodegenParameter;
-import org.openapitools.codegen.CodegenProperty;
-import org.openapitools.codegen.DefaultCodegen;
-import org.openapitools.codegen.GeneratorLanguage;
-import org.openapitools.codegen.IJsonSchemaValidationProperties;
+import org.openapitools.codegen.*;
 import org.openapitools.codegen.meta.features.SecurityFeature;
 import org.openapitools.codegen.model.ModelMap;
 import org.openapitools.codegen.model.ModelsMap;
@@ -863,6 +842,8 @@ public abstract class AbstractPythonCodegen extends DefaultCodegen implements Co
             codegenModelMap.put(cm.classname, ModelUtils.getModelByName(entry.getKey(), objs));
         }
 
+        propagateDiscriminatorValuesToProperties(processed);
+
         // create circular import
         for (String m : codegenModelMap.keySet()) {
             createImportMapOfSet(m, codegenModelMap);
@@ -1054,6 +1035,50 @@ public abstract class AbstractPythonCodegen extends DefaultCodegen implements Co
         }
 
         return objs;
+    }
+
+    private void propagateDiscriminatorValuesToProperties(Map<String, ModelsMap> objMap) {
+        TreeMap<String, CodegenModel> modelMap = new TreeMap<>();
+        for (Map.Entry<String, ModelsMap> entry : objMap.entrySet()) {
+            for (ModelMap m : entry.getValue().getModels()) {
+                modelMap.put(String.format("#/components/schemas/%s", entry.getKey()), m.getModel());
+            }
+        }
+
+        for (Map.Entry<String, ModelsMap> entry : objMap.entrySet()) {
+            for (ModelMap m : entry.getValue().getModels()) {
+                CodegenModel model = m.getModel();
+                if (model.discriminator != null && !model.oneOf.isEmpty()) {
+                    // Populate default, implicit discriminator values
+                    for (String typeName : model.oneOf) {
+                        ModelsMap obj = objMap.get(typeName);
+                        if (obj == null) {
+                            continue;
+                        }
+                        for (ModelMap m1 : obj.getModels()) {
+                            for (CodegenProperty p : m1.getModel().vars) {
+                                if (p.baseName.equals(model.discriminator.getPropertyBaseName())) {
+                                    p.isDiscriminator = true;
+                                    p.discriminatorValue = typeName;
+                                }
+                            }
+                        }
+                    }
+                    // Populate explicit discriminator values from mapping, overwriting default values
+                    for (Map.Entry<String, String> discrEntry : model.discriminator.getMapping().entrySet()) {
+                        CodegenModel resolved = modelMap.get(discrEntry.getValue());
+                        if (resolved != null) {
+                            for (CodegenProperty p : resolved.vars) {
+                                if (p.baseName.equals(model.discriminator.getPropertyBaseName())) {
+                                    p.isDiscriminator = true;
+                                    p.discriminatorValue = discrEntry.getKey();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
 
@@ -2129,7 +2154,16 @@ public abstract class AbstractPythonCodegen extends DefaultCodegen implements Co
         }
 
         private String finalizeType(CodegenProperty cp, PythonType pt) {
-            if (!cp.required || cp.isNullable) {
+            if (cp.isDiscriminator) {
+                moduleImports.add("typing", "Literal");
+                PythonType literal = new PythonType("Literal");
+                String literalValue = String.format("'%s'", cp.discriminatorValue);
+                PythonType valueType = new PythonType(literalValue);
+                literal.addTypeParam(valueType);
+                literal.setDefaultValue(literalValue);
+                cp.setDefaultValue(literalValue);
+                pt = literal;
+            } else if (!cp.required || cp.isNullable) {
                 moduleImports.add("typing", "Optional");
                 PythonType opt = new PythonType("Optional");
                 opt.addTypeParam(pt);
