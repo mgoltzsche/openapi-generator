@@ -41,6 +41,7 @@ for _, name, _ in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + "."):
     tags=["user"],
     summary="Create user",
     response_model_by_alias=True,
+    response_model_exclude_unset=True,
 )
 async def create_user(
     user: User = Body(None, description="Created user object"),
@@ -62,6 +63,7 @@ async def create_user(
     tags=["user"],
     summary="Creates list of users with given input array",
     response_model_by_alias=True,
+    response_model_exclude_unset=True,
 )
 async def create_users_with_array_input(
     user: List[User] = Body(None, description="List of user object"),
@@ -83,6 +85,7 @@ async def create_users_with_array_input(
     tags=["user"],
     summary="Creates list of users with given input array",
     response_model_by_alias=True,
+    response_model_exclude_unset=True,
 )
 async def create_users_with_list_input(
     user: List[User] = Body(None, description="List of user object"),
@@ -105,6 +108,7 @@ async def create_users_with_list_input(
     tags=["user"],
     summary="Delete user",
     response_model_by_alias=True,
+    response_model_exclude_unset=True,
 )
 async def delete_user(
     username: str = Path(..., description="The name that needs to be deleted"),
@@ -128,6 +132,7 @@ async def delete_user(
     tags=["user"],
     summary="Get user by user name",
     response_model_by_alias=True,
+    response_model_exclude_unset=True,
 )
 async def get_user_by_name(
     username: str = Path(..., description="The name that needs to be fetched. Use user1 for testing."),
@@ -147,6 +152,7 @@ async def get_user_by_name(
     tags=["user"],
     summary="Logs user into the system",
     response_model_by_alias=True,
+    response_model_exclude_unset=True,
 )
 async def login_user(
     username: str = Query(None, description="The user name for login", alias="username", regex=r"/^[a-zA-Z0-9]+[a-zA-Z0-9\.\-_]*[a-zA-Z0-9]+$/"),
@@ -166,6 +172,7 @@ async def login_user(
     tags=["user"],
     summary="Logs out current logged in user session",
     response_model_by_alias=True,
+    response_model_exclude_unset=True,
 )
 async def logout_user(
     token_api_key: TokenModel = Security(
@@ -187,6 +194,7 @@ async def logout_user(
     tags=["user"],
     summary="Updated user",
     response_model_by_alias=True,
+    response_model_exclude_unset=True,
 )
 async def update_user(
     username: str = Path(..., description="name that need to be deleted"),
